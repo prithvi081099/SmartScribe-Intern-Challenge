@@ -5,6 +5,11 @@ interface RecordingProps {
   onDownloadRecording: () => void;
 }
 
+interface UploadResult {
+  transcript: string;
+  size: number;
+}
+
 const RecordingComponent: React.FC<RecordingProps> = ({
   onDownloadRecording,
 }) => {
@@ -14,6 +19,11 @@ const RecordingComponent: React.FC<RecordingProps> = ({
   const [audioChunks, setAudioChunks] = useState<Blob[]>([]);
   const [audioUrl, setAudioUrl] = useState<string>("");
   const [microphonePermissionGranted, setMicrophonePermissionGranted] = useState<boolean>(false);
+  const [uploading, setUploading] = useState<boolean>(false);
+  const [uploadError, setUploadError] = useState<string>("");
+  const [uploadSuccess, setUploadSuccess] = useState<boolean>(false);
+  const [transcript, setTranscript] = useState<string>("");
+  const [size, setSize] = useState<number>(0);
 
   const progressInterval = useRef<number | null>(null);
   const mediaRecorder = useRef<MediaRecorder | null>(null);
@@ -41,16 +51,27 @@ const RecordingComponent: React.FC<RecordingProps> = ({
     setProgressTime(0);
   };
 
-  const handleUpload = (audioBlob: Blob) => {
-    UploadManager.upload(audioBlob)
-      .then((response) => {
-        console.log(
-          `Upload successful. Transcript: ${response.transcript}, Size: ${response.size} bytes`
-        );
-      })
-      .catch((error) => {
-        console.error("Upload failed:", error.message);
-      });
+  const handleUpload = async (audioBlob: Blob) => {
+    setUploading(true);
+    setUploadError(""); 
+    setUploadSuccess(false); 
+    setTranscript(""); 
+    setSize(0); 
+
+    try {
+      const response: UploadResult = await UploadManager.upload(audioBlob);
+      console.log(
+        `Upload successful. Transcript: ${response.transcript}, Size: ${response.size} bytes`
+      );
+      setTranscript(response.transcript);
+      setSize(response.size);
+      setUploadSuccess(true);
+    } catch (error:any) {
+      console.error("Upload failed:", error.message);
+      setUploadError(error.message);
+    } finally {
+      setUploading(false);
+    }
   };
 
   const initMediaRecorder = async () => {
@@ -141,7 +162,9 @@ const RecordingComponent: React.FC<RecordingProps> = ({
         >
           {isRecording ? "Stop Recording" : "Start Recording"}
         </button>
+        
       )}
+      <p style={{ color: "red", margin: "5px" }}>{isRecording ? "Recording..." : ""}</p>
       {!recordingName && (
         <p style={{ color: "red" }}>Please enter a name for your recording.</p>
       )}
@@ -176,6 +199,32 @@ const RecordingComponent: React.FC<RecordingProps> = ({
           >
             Download Recording
           </button>
+          <button
+            onClick={() => handleUpload(new Blob(audioChunks))}
+            disabled={!audioChunks.length || uploading || !recordingName || !microphonePermissionGranted}
+            style={{
+              width: "80%",
+              padding: "10px",
+              marginBottom: "20px",
+              borderRadius: "5px",
+              border: "none",
+              backgroundColor: "#007bff",
+              color: "white",
+              cursor: !audioChunks.length || uploading || !recordingName || !microphonePermissionGranted ? "not-allowed" : "pointer",
+            }}
+          >
+            {uploading ? "Uploading..." : "Upload"}
+          </button>
+          {uploadError && (
+            <p style={{ color: "red" }}>Upload failed: {uploadError}</p>
+          )}
+          {uploadSuccess && (
+            <div>
+              <p style={{ color: "green" }}>Upload successful!</p>
+              <p>Transcript: {transcript}</p>
+              <p>Size: {size} bytes</p>
+            </div>
+          )}
         </div>
       )}
     </div>
