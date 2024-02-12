@@ -35,6 +35,7 @@ const RecordingComponent: React.FC<RecordingProps> = ({
 
     mediaRecorder.current.stop();
     setIsRecording(false);
+    clearInterval(progressInterval.current);
     progressInterval.current = null;
     setProgressTime(0);
   };
